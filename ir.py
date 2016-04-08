@@ -74,14 +74,14 @@ def normalize(text):
     return stem_tokens(nltk.word_tokenize(text.lower().translate(remove_punctuation_map)))
 
 
-vectorizer = TfidfVectorizer(tokenizer=normalize, stop_words='english')
+category_collection = TfidfVectorizer(tokenizer=normalize, stop_words='english')
 
 category_documents = os.walk('result/').next()[-1]
 
-tf_idf = vectorizer.fit_transform(category_documents)
+category_tf_idf = category_collection.fit_transform(category_documents)
 
 
-def cosine_sim(query, top_k=5):
+def cosine_sim(query, tf_idf, vectorizer, top_k=5):
     query = str(query)
     query_vector = vectorizer.transform([query])
     sims = linear_kernel(query_vector, tf_idf).flatten()
@@ -91,7 +91,10 @@ def cosine_sim(query, top_k=5):
 
 query = 'Puzzles'
 
-print cosine_sim(query, 5)
+print cosine_sim(query, category_tf_idf, category_collection, 5)
+
+asin_collection = TfidfVectorizer(tokenizer=normalize, stop_words='english')
+
 
 # # prepare_categories(root + meta)
 # prepare_reviews(root + reviews)
