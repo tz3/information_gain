@@ -63,3 +63,9 @@ target/
 documents/
 collections/
 *.pickle
+result/
+reviews/
+categories/
+*.tar.gz
+.idea/
+.DS_Store

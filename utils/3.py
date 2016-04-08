@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 import os
 
-from utils.utils import get_file_list, get_tokens, save_data, load_data
+from utils.utils import get_file_list, get_tokens, save_data, load_data, save_binary
 
 
 class Element(object):
@@ -36,6 +36,19 @@ class Element(object):
         return self.term.__le__(other.term)
 
 
+class ElementPresenter(object):
+    def __init__(self, count_entrance, element):
+        self.entrance = count_entrance
+        self.term = element.term[count_entrance:]
+        self.count = element.count
+        self.posting_lists = element.posting_lists
+
+    def __str__(self):
+        return "%d, remain:%s, count:%d, " % (self.entrance, self.term, self.count) + '|'.join(str(v) for v in self.posting_lists)
+
+    def __unicode__(self):
+        return self.__str__()
+
 def compare(term1, term2):
     c = min(len(term1), len(term2))
     for x in xrange(c):
@@ -64,9 +77,6 @@ def get_index(folder_name, force_update=False):
         save_data(result, name=index_file_name)
 
 
-index = get_index('documents', force_update=False)
-
-
 def compress(name, k=8, force_update=False):
     result = []
     block_list = []
@@ -77,41 +87,21 @@ def compress(name, k=8, force_update=False):
     else:
         elements = load_data(elements_file_name)
         for i in xrange(0, len(elements), k):
-            block_list.append(
-                    (0,
-                     elements[i].term,
-                     elements[i].count,
-                     elements[i].posting_lists
-                     )
-            )
+            block_list.append(ElementPresenter(0, elements[i]))
             last_index = len(elements) - i
             for bi in xrange(1, min(k, last_index)):
                 c = compare(elements[i + bi - 1].term, elements[i + bi].term)
-                block_list.append(
-                        (c,
-                         elements[i + bi].term[c:],
-                         elements[i + bi].count,
-                         # elements[i + bi].term,
-                         elements[i + bi].posting_lists
-                         )
-                )
+                block_list.append(ElementPresenter(c, elements[i + bi]))
             result.append(block_list)
             block_list = []
         save_data(result, compressed_elements_file_name)
         return result
 
 
-compressed = compress('documents', 8, True)[:4]
-for c in compressed:
-    print c
-
-print 'lookup'
-
-
 def term_lookup(term, compressed):
     def find_block():
         def check(m):
-            return term < m[0][1]
+            return term < m[0].term
 
         l = 0
         r = len(compressed)
@@ -124,18 +114,41 @@ def term_lookup(term, compressed):
         return compressed[l]
 
     def find_in_block(block):
-        current_word = block[0][1]
+        current_word = block[0].term
         if current_word == term:
-            return current_word, block[0]
+            return current_word, str(block[0])
         for el_index in xrange(1, len(block)):
-            current_word = current_word[:block[el_index][0]] + block[el_index][1]
+            current_word = current_word[:block[el_index].entrance] + block[el_index].term
             if current_word == term:
-                return current_word, block[el_index]
+                return current_word, str(block[el_index])
         return '', None
 
     return find_in_block(find_block())
 
 
+def check(compressed):
+    for x in compressed:
+        for q in xrange(1, len(x)):
+            if x[q].entrance == 0:
+                return x[q]
+    return None
+
+
+# index = get_index('documents', force_update=False)
+# print index[0]
+# save_binary(index, 'index.bin')
+compressed = compress('documents', 8, False)
+block = compressed[255]
+current_word = block[0].term
+print current_word
+for el_index in xrange(1, len(block)):
+    current_word = current_word[:block[el_index].entrance] + block[el_index].term
+    print "*%s, full_term: %s, leave: %s"% (current_word[:block[el_index].entrance], current_word, block[el_index].term)
+# save_binary(compressed, 'compressed.bin')
+
+# print check(compressed)
+
+# print 'lookup'
 print term_lookup('0019', compressed)  # found
 print term_lookup('000usd', compressed)  # found
 print term_lookup('01234', compressed)  # found
