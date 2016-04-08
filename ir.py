@@ -2,7 +2,12 @@ import gzip
 import os
 from collections import defaultdict
 
-root = '/Users/rinatahmetov/Downloads/'
+import nltk
+import string
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.metrics.pairwise import linear_kernel
+
+root = '/Users/blvp.me/python/global/information_gain/'
 meta = 'meta_Toys_and_Games.json.gz'
 reviews = 'reviews_Toys_and_Games.json.gz'
 
@@ -45,19 +50,50 @@ def write_file(file_name, data):
         f.write('\n'.join(data))
 
 
-files = os.walk('categories/').next()[-1]
-for f in files:
-    with open("categories/%s" % f, 'rb') as cat_f:
-        for asin in cat_f.readlines():
-            file_name = "reviews/%s" % asin.replace('\n', '')
-            if os.path.isfile(file_name) == 1:
-    			 review = open(file_name,  'rb')
-    			 r = open("result/%s" % f, 'w')
-    			 r.writelines(review.readlines())
-    			 r.close()
-    			 review.close()
+# files = os.walk('categories/').next()[-1]
+# for f in files:
+#     with open("categories/%s" % f, 'rb') as cat_f:
+#         for asin in cat_f.readlines():
+#             file_name = "reviews/%s" % asin.replace('\n', '')
+#             if os.path.isfile(file_name) == 1:
+#                 review = open(file_name, 'rb')
+#                 r = open("result/%s" % f, 'w')
+#                 r.writelines(review.readlines())
+#                 r.close()
+#                 review.close()
 
-# prepare_categories(root + meta)
+stemmer = nltk.stem.snowball.SnowballStemmer('english')
+remove_punctuation_map = dict((ord(char), None) for char in string.punctuation)
+
+
+def stem_tokens(tokens):
+    return [stemmer.stem(item) for item in tokens]
+
+
+def normalize(text):
+    return stem_tokens(nltk.word_tokenize(text.lower().translate(remove_punctuation_map)))
+
+
+vectorizer = TfidfVectorizer(tokenizer=normalize, stop_words='english')
+
+category_documents = os.walk('result/').next()[-1]
+
+tf_idf = vectorizer.fit_transform(category_documents)
+
+
+def cosine_sim(query, top_k=5):
+    query = str(query)
+    query_vector = vectorizer.transform([query])
+    sims = linear_kernel(query_vector, tf_idf).flatten()
+    related = sims.argsort()[:-top_k:-1]
+    return sims[related], [category_documents[i] for i in related]
+
+
+query = 'Puzzles'
+
+print cosine_sim(query, 5)
+
+# # prepare_categories(root + meta)
 # prepare_reviews(root + reviews)
 
 
