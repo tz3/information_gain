@@ -48,22 +48,24 @@ class Engine(object):
         asin_docs = []
         asin_ids = []
         for c in category:
-            doc_ids, docs = self.get_asin_by_category(c)
+            ids, docs = self.get_asin_by_category(c)
             asin_docs = asin_docs + docs
-            asin_ids = asin_ids + doc_ids
+            asin_ids = asin_ids + ids
 
         asin_tf_idf = self.vectorizer.fit_transform(asin_docs)
         asin_cos_sims, asins = cosine_sim(q, asin_ids, asin_tf_idf, self.vectorizer)
         return asin_cos_sims, asins
 
     def get_asin_by_category(self, category):
-        docs = []
-        doc_ids = os.walk(self.categories_path).next()[-1]
-
-        for cat in doc_ids:
-            with open(self.categories_path + cat, mode='r') as f:
-                docs.append('\n'.join(f.readlines()))
-        return doc_ids, docs
+        asin_ids = []
+        asin_docs = []
+        with open(self.categories_to_asin_path + category, 'r') as f:
+            for asin in f.readlines():
+                asin = asin.replace('\n', '')
+                asin_ids.append(asin)
+                with open(self.asin_path + asin, 'r') as asin_doc:
+                    asin_docs.append(' '.join(asin_doc.readlines()))
+        return asin_ids, asin_docs
 
 
 search_engine = Engine('reviews/', 'result/', 'categories/')
@@ -71,4 +73,4 @@ while True:
     query = raw_input("\n\nquery or \q for quit\n")
     if query == '\q':
         break
-    print search_engine.query(query)
+    search_engine.query(query)
