@@ -1,9 +1,9 @@
 import os
+import string
 
 import nltk
-import string
 from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.metrics.pairwise import linear_kernel, cosine_similarity
+from sklearn.metrics.pairwise import cosine_similarity
 
 __stemmer = nltk.stem.snowball.SnowballStemmer('english')
 __remove_punctuation_map = dict((ord(char), None) for char in string.punctuation)
@@ -31,30 +31,39 @@ class Engine(object):
         self.categories_path = categories_path
         self.categories_to_asin_path = categories_to_asin_path
         self.vectorizer = TfidfVectorizer(tokenizer=normilizer, stop_words='english')
-
-        docs = []
-        doc_ids = os.walk(categories_path).next()[-1]
-
-        self.__doc_ids = doc_ids
-        for cat in doc_ids:
-            with open(categories_path + cat, mode='r') as f:
-                docs.append('\n'.join(f.readlines()))
+        self.__doc_ids, docs = self.get_categories()
         self.categories_tf_idf = self.vectorizer.fit_transform(docs)
+
+    def get_categories(self):
+        docs = []
+        doc_ids = os.walk(self.categories_path).next()[-1]
+        for cat in doc_ids:
+            with open(self.categories_path + cat, mode='r') as f:
+                docs.append('\n'.join(f.readlines()))
+        return doc_ids, docs
 
     def query(self, q):
         vals, category = cosine_sim(q, self.__doc_ids, self.categories_tf_idf, self.vectorizer, self.top_k)
+
         asin_docs = []
         asin_ids = []
         for c in category:
-            with open(self.categories_to_asin_path + c, 'r') as f:
-                for asin in f.readlines():
-                    asin = asin.replace('\n', '')
-                    asin_ids.append(asin)
-                    with open(self.asin_path + asin, 'r') as asin_doc:
-                        asin_docs.append(' '.join(asin_doc.readlines()))
+            doc_ids, docs = self.get_asin_by_category(c)
+            asin_docs = asin_docs + docs
+            asin_ids = asin_ids + doc_ids
+
         asin_tf_idf = self.vectorizer.fit_transform(asin_docs)
         asin_cos_sims, asins = cosine_sim(q, asin_ids, asin_tf_idf, self.vectorizer)
-        print asin_cos_sims, asins
+        return asin_cos_sims, asins
+
+    def get_asin_by_category(self, category):
+        docs = []
+        doc_ids = os.walk(self.categories_path).next()[-1]
+
+        for cat in doc_ids:
+            with open(self.categories_path + cat, mode='r') as f:
+                docs.append('\n'.join(f.readlines()))
+        return doc_ids, docs
 
 
 search_engine = Engine('reviews/', 'result/', 'categories/')
@@ -62,4 +71,4 @@ while True:
     query = raw_input("\n\nquery or \q for quit\n")
     if query == '\q':
         break
-    search_engine.query(query)
+    print search_engine.query(query)
